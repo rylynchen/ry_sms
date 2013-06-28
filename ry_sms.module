@@ -1,0 +1,59 @@
+<?php
+
+function ry_sms($did) {
+  $sms = new RySms($did);
+  return $sms;
+}
+
+class RySms {
+  const PRI = 0;
+  const INPOOL = 0;
+  public $did;
+  public $database;
+  public $data = array();
+
+  public function __construct($did) {
+    global $databases;
+    if (!in_array($did, array_keys($databases['default']))) {
+      watchdog('ry_sms', 'Construct fail, disable did :' . $did);
+      return FALSE;
+    }
+    $this->did = $did;
+    $this->database = $databases['default'][$did]['database'];
+  }
+
+  public function validate($type, $data) {
+    if ($type == 'phone') {
+      if (preg_match("/^((13[0-9])|(15[^4])|(18[0,5-9]))[0-9]{8}$/", $data))
+        return TRUE;
+    }
+    return FALSE;
+  }
+
+  public function initData($data = array()) {
+    if (!isset($data['phone']) || !self::validate('phone', $data['phone'])) {
+      watchdog('ry_sms', 'Construct fail, disable phone :' . $data['phone']);
+      return FALSE;
+    }
+    if (empty($data['msg'])) {
+      watchdog('ry_sms', 'Init data fail, empty msg');
+      return FALSE;
+    }
+    $this->data['receiver'] = trim($data['phone']);
+    $this->data['content'] = trim($data['msg']);
+    $this->data['Pri'] = is_numeric(@$data['pri']) ? $data['pri'] : self::PRI;
+    $this->data['inpool'] = is_numeric(@$data['inpool']) ? $data['inpool'] : self::INPOOL;
+    return $this;
+  }
+
+  public function execute() {
+    global $databases;
+    Database :: addConnectionInfo($this->did, 'default', $databases['default'][$this->did]);
+    $this->data['inserttime'] = date("Y-m-d H:i:s");
+    $this->data['SendTime'] = date("Y-m-d H:i:s");
+    watchdog('ry_sms', 'send message, phone :' . $this->data['receiver'] . ', msg :' . $this->data['content']);
+    db_set_active($this->did);
+    db_insert($this->database . '.sms_boxsending')->fields($this->data)->execute();
+    db_set_active('default');
+  }
+}

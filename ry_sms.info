@@ -1,0 +1,5 @@
+name = Ry Sms
+description = Rylyn send phone message module
+package = Rylyn
+core = 7.x
+files[] = ry_sms.module
